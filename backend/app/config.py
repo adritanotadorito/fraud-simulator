@@ -13,15 +13,15 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     
     FUSION_WEIGHTS: Dict[str, float] = {
-        "xgboost": 0.4,
-        "isolation_forest": 0.2,
-        "rule_engine": 0.25,
-        "graph": 0.15
+        "xgboost": 0.55,
+        "isolation_forest": 0.20,
+        "rule_engine": 0.15,
+        "graph": 0.10
     }
     
     DECISION_THRESHOLDS: Dict[str, float] = {
-        "block": 0.75,
-        "flag": 0.45
+        "block": 0.80,
+        "flag": 0.50
     }
 
     model_config = SettingsConfigDict(

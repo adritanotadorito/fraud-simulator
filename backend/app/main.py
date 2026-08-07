@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from app.database import connect_to_mongo, close_mongo_connection, get_database, count_documents
+from app.database import connect_to_mongo, close_mongo_connection, get_database, count_documents, is_connected
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -81,11 +81,12 @@ async def root():
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    try:
-        db = get_database()
-        return {"status": "healthy", "db": "connected"}
-    except Exception:
-        return {"status": "degraded", "db": "disconnected"}
+    db_status = "connected" if is_connected() else "disconnected"
+    return {
+        "status": "healthy" if is_connected() else "degraded",
+        "db": db_status,
+        "version": "1.0.0"
+    }
 
 
 if __name__ == "__main__":
