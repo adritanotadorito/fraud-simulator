@@ -1,0 +1,266 @@
+# Fraud Shield AI
+
+**Real-Time Adversarial Fraud Detection & Prevention Platform**  
+FraudGPT (Red Team AI) vs ShieldGPT (Blue Team AI)
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Presentation Layer                          │
+│              React + Tailwind SOC Dashboard (TBD)               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         API Layer (FastAPI)                     │
+│  /transactions  /fraud  /shield  /biometrics  /device           │
+│  /geo  /graph  /threat-intel  /metrics  /reports               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    AI Orchestration Layer                       │
+│  ┌──────────────────┐         ┌──────────────────┐             │
+│  │    FraudGPT      │         │    ShieldGPT     │             │
+│  │  (Red Team)      │────────▶│  (Blue Team)     │             │
+│  │  7 Personas      │  Attack │  7 Engines       │             │
+│  │  Memory/Linux.1370 |
+| 78 | 2019-09-25 18:08:21 000000000 +0000
+@@ -49,7 +49,7 @@
+  │  /graph  /threat-intel  /metrics  /reports               │
+  │  │
+  │  └─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Features
+
+### Red Team: FraudGPT
+- **7 Attack Personas**: Account Takeover, Credential Stuffing, Card Testing, Device Spoofing, Money Mule, Social Engineering, Low-and-Slow
+- **Adaptive Strategy**: Multi-armed bandit learning from past attack outcomes
+- **LLM-Generated Attacks**: Structured JSON attack parameters via Gemini/OpenAI
+- **Memory Persistence**: MongoDB storage of fraud events with outcomes
+
+### Blue Team: ShieldGPT
+- **7 Detection Engines** (parallel execution):
+  - **Device Intelligence**: VPN/TOR/Emulator/Rooted detection + new device flagging
+  - **Geolocation**: Impossible travel (haversine), country changes, high-risk regions
+  - **Behavioral Biometrics**: Typing rhythm, mouse pattern, session duration vs baseline
+  - **Graph Analysis**: NetworkX fraud ring detection, shared device analysis
+  - **Threat Intelligence**: Watchlist lookup (IP, device, merchant, account)
+  - **XGBoost Classifier**: Trained on creditcard.csv (284k transactions)
+  - **Isolation Forest**: Anomaly detection on behavioral features
+  - **Rule Engine**: Deterministic checks (amount, time, device flags)
+- **Hybrid Fusion**: Weighted scoring (XGB 55%, IF 20%, Rules 15%, Graph 10%)
+- **LLM Explanations**: Human-readable decisions with top contributing signals
+
+### Simulation & Data
+- **Digital Twin**: 50 synthetic users, 98 accounts, 76 devices, 30 merchants, 200 historical transactions
+- **Threat Intel Watchlist**: 20 pre-seeded entries
+- **WebSocket Streaming**: Real-time transaction/decision feed
+
+### Monitoring & Reports
+- **Dashboard Metrics**: Live TPS, detection rate, avg risk, latency
+- **Model Metrics**: Accuracy, Precision, Recall, F1, ROC-AUC computed from ground truth
+- **Incident Reports**: JSON/CSV export with decision details
+- **Fraud Evolution Timeline**: Round-by-round attack/defense history
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Python 3.11+
+- MongoDB (local or Atlas)
+- Optional: Gemini/OpenAI API key for LLM features
+
+### Local Development
+
+```bash
+# 1. Start MongoDB
+docker run -d --name fraud-mongo -p 27017:27017 mongo:7
+
+# 2. Install backend dependencies
+cd backend
+pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your MongoDB URI and optional LLM API keys
+
+# 4. Run backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### API Endpoints
+
+| Category | Endpoint | Description |
+|----------|----------|-------------|
+| **Health** | `GET /health` | Service health check |
+| **Fraud (Red)** | `POST /api/fraud/attack` | Trigger FraudGPT attack |
+| | `POST /api/fraud/simulate-round` | Full adversarial round |
+| | `GET /api/fraud/memory` | FraudGPT learned weights |
+| | `GET /api/fraud/events` | List fraud events |
+| **Shield (Blue)** | `POST /api/shield/decision` | Score transaction |
+| | `GET /api/shield/decisions` | List decisions |
+| **Engines** | `POST /api/device/score` | Device risk |
+| | `POST /api/geo/score` | Geo risk |
+| | `POST /api/biometrics/score` | Biometric risk |
+| | `POST /api/graph/score` | Graph risk |
+| | `GET /api/threat-intel/lookup` | Watchlist check |
+| **Metrics** | `GET /api/metrics/dashboard` | Real-time dashboard |
+| | `POST /api/metrics/compute` | Compute model metrics |
+| **Reports** | `GET /api/reports/summary` | System summary |
+| | `GET /api/reports/incident` | Incident reports (JSON/CSV) |
+
+### Example Usage
+
+```bash
+# Trigger an account takeover attack
+curl -X POST http://localhost:8000/api/fraud/attack \
+  -H "Content-Type: application/json" \
+  -d '{"persona": "account_takeover"}'
+
+# Score a transaction
+curl -X POST http://localhost:8000/api/shield/decision \
+  -H "Content-Type: application/json" \
+  -d '{"txn_id": "<txn_id_from_attack>", "include_explanation": true}'
+
+# Run full adversarial round
+curl -X POST http://localhost:8000/api/fraud/simulate-round \
+  -H "Content-Type: application/json" \
+  -d '{"persona": "card_testing"}'
+
+# View dashboard
+curl http://localhost:8000/api/metrics/dashboard
+```
+
+---
+
+## Project Structure
+
+```
+fraud-simulator/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI app + lifespan
+│   │   ├── config.py               # Settings (Pydantic)
+│   │   ├── database.py             # MongoDB async helpers
+│   │   ├── models/schemas.py       # Pydantic models
+│   │   ├── routers/                # API endpoints
+│   │   ├── engines/                # Detection engines
+│   │   │   ├── device.py
+│   │   │   ├── geo.py
+│   │   │   ├── biometrics.py
+│   │   │   ├── graph.py
+│   │   │   └── threat_intel.py
+│   │   ├── ml/                     # ML models
+│   │   │   ├── xgboost_model.py
+│   │   │   ├── isolation_forest.py
+│   │   │   ├── rule_engine.py
+│   │   │   └── fusion.py
+│   │   ├── orchestrator/           # AI orchestration
+│   │   │   ├── fraudgpt.py
+│   │   │   ├── shieldgpt.py
+│   │   │   └── llm_client.py
+│   │   ├── ws/manager.py           # WebSocket manager
+│   │   └── data/digital_twin.py    # Synthetic data generator
+│   ├── requirements.txt
+│   └── Dockerfile
+├── ml/
+│   ├── train.py                    # Model training script
+│   ├── feature_engineering.py
+│   ├── fusion.py
+│   ├── rule_engine.py
+│   ├── prompts.py                  # LLM prompts
+│   ├── monitor.py
+│   └── models/                     # Trained models (.pkl)
+│       ├── fraud_model.pkl
+│       └── isolation_forest.pkl
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## Model Training
+
+```bash
+cd ml
+# Requires creditcard.csv in ml/data/ (Kaggle Credit Card Fraud dataset)
+python train.py
+```
+
+Models saved to `ml/models/` and auto-loaded by backend.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FRAUD_SHIELD_MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection |
+| `FRAUD_SHIELD_MONGO_DB_NAME` | `fraud_shield_ai` | Database name |
+| `FRAUD_SHIELD_LLM_PROVIDER` | `gemini` | `gemini` or `openai` |
+| `FRAUD_SHIELD_GEMINI_API_KEY` | - | Google Gemini API key |
+| `FRAUD_SHIELD_OPENAI_API_KEY` | - | OpenAI API key |
+| `FRAUD_SHIELD_LOG_LEVEL` | `INFO` | Logging level |
+| `FRAUD_SHIELD_CORS_ORIGINS` | `["*"]` | CORS origins |
+
+---
+
+## Current Status
+
+✅ **Backend Complete**: All APIs, engines, orchestration, ML models, digital twin  
+✅ **ML Models**: XGBoost + IsolationForest trained and loading  
+✅ **Database**: MongoDB schema, indexes, auto-seeding  
+✅ **Adversarial Loop**: FraudGPT ↔ ShieldGPT working end-to-end  
+✅ **Real-time**: WebSocket streaming, live dashboard metrics  
+⏳ **Frontend**: React + Tailwind dashboard (not started)  
+⏳ **Docker**: Build in progress (large xgboost download)  
+⏳ **LLM Integration**: Fallback mode (needs API keys)
+
+---
+
+## Demo Flow
+
+```bash
+# 1. Start backend (as above)
+
+# 2. Trigger attacks and watch ShieldGPT defend
+curl -X POST http://localhost:8000/api/fraud/simulate-round -d '{"persona": "account_takeover"}'
+curl -X POST http://localhost:8000/api/fraud/simulate-round -d '{"persona": "card_testing"}'
+curl -X POST http://localhost:8000/api/fraud/simulate-round -d '{"persona": "device_spoofing"}'
+
+# 3. Watch FraudGPT adapt (memory updates)
+curl http://localhost:8000/api/fraud/memory
+
+# 4. View real-time dashboard
+curl http://localhost:8000/api/metrics/dashboard
+
+# 5. Generate incident report
+curl http://localhost:8000/api/reports/incident?format=json
+```
+
+---
+
+## Team
+
+- **Adrita** - ML & AI Engineer (XGBoost, Isolation Forest, Feature Engineering, FraudGPT Strategy)
+- **Riya** - Backend & AI Orchestration (FastAPI, FraudGPT/ShieldGPT, Engines, Docker)
+- **Simran** - Frontend & Database (React Dashboard, MongoDB Schema, Reports)
+
+---
+
+## License
+
+MIT
