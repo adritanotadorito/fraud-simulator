@@ -1,0 +1,11 @@
+{
+  "name": "fraud-shield-ai-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix \"fraud-dashboard 2\" run dev",
+    "build": "npm --prefix \"fraud-dashboard 2\" run build",
+    "preview": "npm --prefix \"fraud-dashboard 2\" run preview",
+    "backend": "cd backend && ./.venv/bin/uvicorn app.main:app --reload --port 8000"
+  }
+}

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Timeline from './pages/Timeline'
 import Monitoring from './pages/Monitoring'
 import Reports from './pages/Reports'
+import RealData from './pages/RealData'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
           <main className="flex-1 overflow-hidden">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/real-data" element={<RealData />} />
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/monitoring" element={<Monitoring />} />
               <Route path="/reports" element={<Reports />} />
@@ -25,3 +27,4 @@ export default function App() {
     </WebSocketProvider>
   )
 }
+

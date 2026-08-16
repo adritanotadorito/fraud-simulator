@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Clock, Activity, FileBarChart, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, Clock, Activity, FileBarChart, ShieldCheck, Database } from 'lucide-react'
 import { useLiveFeed } from '../context/WebSocketContext'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/real-data', label: 'Real Transactions', icon: Database },
   { to: '/timeline', label: 'Attack Timeline', icon: Clock },
   { to: '/monitoring', label: 'Engine Logs', icon: Activity },
   { to: '/reports', label: 'Audit Logs', icon: FileBarChart },

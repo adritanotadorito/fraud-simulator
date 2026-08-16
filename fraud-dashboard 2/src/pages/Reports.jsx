@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import TopBar from '../components/TopBar'
 import { FileText, Download, ShieldX, AlertTriangle, ShieldCheck, Filter } from 'lucide-react'
 import { severityOf } from '../lib/severity'
+import { toPercent } from '../lib/format' // Fix: needed to handle confidence as string ("71%") or float (0.71)
 import { useLiveFeed } from '../context/WebSocketContext'
 
 const DEFAULT_INCIDENTS = [
@@ -155,7 +156,9 @@ export default function Reports() {
                           </span>
                         </td>
                         <td className="py-3 text-text">{(d.risk_score * 100).toFixed(0)}%</td>
-                        <td className="py-3 text-text-muted">{((d.confidence || 0.8) * 100).toFixed(0)}%</td>
+                        {/* OLD: <td className="py-3 text-text-muted">{((d.confidence || 0.8) * 100).toFixed(0)}%</td> */}
+                        {/* BUG: mockEvents returns confidence as a string like "71%", so * 100 gives NaN */}
+                        <td className="py-3 text-text-muted">{toPercent(d.confidence || 0.8).toFixed(0)}%</td>
                         <td className="py-3 text-text-dim truncate max-w-xs">
                           {d.reasons ? d.reasons.join(', ') : 'Normal baseline'}
                         </td>
