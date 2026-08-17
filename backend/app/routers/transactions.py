@@ -57,6 +57,116 @@ async def list_transactions(
     return results
 
 
+@router.get("/real")
+async def list_real_transactions(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0)
+):
+    """List strictly real-world transactions (is_real=True or non-simulated)."""
+    query = {"$or": [{"is_real": True}, {"is_simulated": {"$ne": True}}]}
+    results = await find_many("transactions", query, limit=limit, sort=[("timestamp", -1)])
+    for r in results:
+        r.pop("_id", None)
+    return results
+
+
+@router.get("/simulated")
+async def list_simulated_transactions(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0)
+):
+    """List strictly simulated/synthetic transactions."""
+    query = {"$or": [{"is_simulated": True}, {"is_real": False}]}
+    results = await find_many("transactions", query, limit=limit, sort=[("timestamp", -1)])
+    for r in results:
+        r.pop("_id", None)
+    return results
+
+
+@router.post("/ingest-real")
+async def ingest_real_transaction(payload: dict):
+    """Ingest a real-world transaction payload, evaluate risk, store in DB, and broadcast."""
+    from app.orchestrator.shieldgpt import ShieldGPTOrchestrator
+    from app.orchestrator.llm_client import LLMClient
+    from app.models.schemas import ScoreRequest
+
+    txn_id = payload.get("txn_id") or f"txn_real_{uuid.uuid4().hex[:8]}"
+    amount = float(payload.get("amount", 100.0))
+    currency = payload.get("currency", "USD")
+    merchant_name = payload.get("merchant_name") or payload.get("merchant") or "Real Merchant Store"
+    user_id = payload.get("user_id") or "usr_real_001"
+    account_id = payload.get("account_id") or "acc_real_001"
+    device_id = payload.get("device_id") or "dev_real_001"
+    source = payload.get("source") or "real_upload"
+
+    geo = payload.get("geo") or {
+        "ip": payload.get("ip_address") or "103.211.52.12",
+        "country": payload.get("country") or "India",
+        "city": payload.get("city") or "Bengaluru",
+        "latitude": float(payload.get("lat") or 12.9716),
+        "longitude": float(payload.get("lon") or 77.5946)
+    }
+
+    txn_document = {
+        "txn_id": txn_id,
+        "account_id": account_id,
+        "user_id": user_id,
+        "amount": amount,
+        "currency": currency,
+        "merchant_id": payload.get("merchant_id") or "merch_real_1",
+        "merchant_name": merchant_name,
+        "device_id": device_id,
+        "session_id": payload.get("session_id") or f"sess_real_{uuid.uuid4().hex[:6]}",
+        "geo": geo,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "type": payload.get("type", "purchase"),
+        "is_real": True,
+        "is_simulated": False,
+        "source": source
+    }
+
+    await insert_one("transactions", txn_document)
+
+    # Evaluate via ShieldGPT
+    llm = LLMClient()
+    shield = ShieldGPTOrchestrator(llm)
+    try:
+        score_resp = await shield.analyze_transaction(ScoreRequest(txn_id=txn_id))
+        decision_data = score_resp.model_dump()
+    except Exception as e:
+        logger.warning(f"ShieldGPT scoring error on real txn {txn_id}: {e}")
+        decision_data = {
+            "txn_id": txn_id,
+            "decision": "ALLOW" if amount < 5000 else "FLAG",
+            "risk_score": 0.15 if amount < 5000 else 0.65,
+            "confidence": 0.85,
+            "reasons": ["Manual ingestion evaluation"],
+            "explanation": "Ingested real transaction analyzed",
+            "engine_scores": {}
+        }
+
+    # Broadcast via WebSocket
+    event_payload = {
+        "event_id": f"evt_{uuid.uuid4().hex[:8]}",
+        "transaction": {
+            "transaction_id": txn_id,
+            "merchant": merchant_name,
+            "amount": amount,
+            "user_id": user_id,
+            "account_id": account_id,
+            "timestamp": txn_document["timestamp"]
+        },
+        "shieldgpt": decision_data,
+        "fraudgpt": {
+            "persona": "real_ingest"
+        }
+    }
+    manager = get_manager()
+    await manager.broadcast(event_payload)
+
+    return {"status": "success", "transaction": txn_document, "decision": decision_data}
+
+
 @router.get("/uploaded")
 async def list_uploaded_transactions(
     source: str = Query(..., description="Source tag from upload, e.g. 'upload:filename.csv'"),

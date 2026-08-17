@@ -1,7 +1,8 @@
 import { toPercent } from '../lib/format'
 
 export default function ConfidenceMeter({ event }) {
-  const confidence = event ? toPercent(event.shieldgpt.confidence) : 0
+  const rawConf = event?.shieldgpt?.confidence ?? 0.85
+  const confidence = Math.round((parseFloat(rawConf) || 0) * (rawConf <= 1 ? 100 : 1))
   const label = confidence >= 90 ? 'High Precision' : confidence >= 70 ? 'Moderate' : 'Low Precision'
 
   return (

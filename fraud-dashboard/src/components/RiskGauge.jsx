@@ -6,7 +6,8 @@ import { severityOf } from '../lib/severity'
 // a subtle radar-sweep pulse plays behind it to tie into the SOC "scanning" theme.
 export default function RiskGauge({ event }) {
   const [displayValue, setDisplayValue] = useState(0)
-  const finalRisk = event ? toPercent(event.ml.final_risk) : 0
+  const rawRisk = event?.shieldgpt?.risk_score ?? event?.ml?.final_risk ?? 0
+  const finalRisk = Math.round((parseFloat(rawRisk) || 0) * (rawRisk <= 1 ? 100 : 1))
   const decision = event?.shieldgpt?.decision || 'ALLOW'
   const sev = severityOf(decision)
 

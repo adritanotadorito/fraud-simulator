@@ -10,14 +10,23 @@ function timeAgo(iso) {
 }
 
 function FeedRow({ evt, onSelect, isSelected }) {
-  const { transaction, shieldgpt, fraudgpt } = evt
-  const sev = severityOf(shieldgpt.decision)
+  if (!evt) return null
+  const transaction = evt.transaction || {}
+  const shieldgpt = evt.shieldgpt || {}
+  const fraudgpt = evt.fraudgpt || {}
+
+  const decision = shieldgpt.decision || 'ALLOW'
+  const sev = severityOf(decision)
 
   const glowStyles = {
     ALLOW: 'hover:border-safe/50 hover:shadow-[0_0_16px_rgba(16,185,129,0.16)]',
     FLAG: 'hover:border-flag/50 hover:shadow-[0_0_16px_rgba(245,158,11,0.16)]',
     BLOCK: 'hover:border-block/50 hover:shadow-[0_0_16px_rgba(244,63,94,0.16)]',
-  }[shieldgpt.decision] || 'hover:border-text/40 hover:shadow-[0_0_16px_rgba(255,255,255,0.08)]'
+  }[decision] || 'hover:border-text/40 hover:shadow-[0_0_16px_rgba(255,255,255,0.08)]'
+
+  const amountVal = parseFloat(transaction.amount || 0)
+  const txnId = transaction.transaction_id || transaction.txn_id || '—'
+  const merchantName = transaction.merchant || transaction.merchant_name || 'Unknown Merchant'
 
   return (
     <button
@@ -32,11 +41,11 @@ function FeedRow({ evt, onSelect, isSelected }) {
 
       <div className="min-w-0 flex-1">
         <div className="truncate font-sans text-xs font-medium text-text group-hover:text-white">
-          {transaction.merchant || 'Unknown Merchant'}
+          {merchantName}
         </div>
         <div className="flex items-center gap-1.5 font-mono text-[11px] text-text-dim group-hover:text-text-muted">
-          <span className="truncate">{transaction.transaction_id}</span>
-          {fraudgpt && (
+          <span className="truncate">{txnId}</span>
+          {fraudgpt?.persona && (
             <>
               <span>·</span>
               <span className="truncate font-normal text-text-muted">{fraudgpt.persona}</span>
@@ -46,7 +55,7 @@ function FeedRow({ evt, onSelect, isSelected }) {
       </div>
 
       <div className="shrink-0 font-mono text-xs font-medium text-text">
-        ₹{transaction.amount.toLocaleString('en-IN')}
+        ${amountVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
 
       <div className="shrink-0 rounded border border-border bg-panel-raised px-1.5 py-0.5 font-mono text-[10px] text-text-muted group-hover:border-border/80">
@@ -54,7 +63,7 @@ function FeedRow({ evt, onSelect, isSelected }) {
       </div>
 
       <div className="w-12 shrink-0 text-right font-mono text-[11px] text-text-dim">
-        {timeAgo(transaction.timestamp)}
+        {timeAgo(transaction.timestamp || new Date().toISOString())}
       </div>
     </button>
   )

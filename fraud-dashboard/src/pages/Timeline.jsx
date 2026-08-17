@@ -5,6 +5,7 @@ import {
 import { severityOf } from '../lib/severity'
 import { useLiveFeed } from '../context/WebSocketContext'
 import { API_URL } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 
 const DEFAULT_PERSONAS = {
   account_takeover: { label: 'Account Takeover', weight: 0.7, description: 'Stolen credentials login attempt from foreign IP/device' },
@@ -45,6 +46,8 @@ const DEFAULT_SAMPLE_EVENTS = [
 
 export default function Timeline() {
   const { events: liveFeedEvents } = useLiveFeed()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [dbEvents, setDbEvents] = useState([])
   const [memory, setMemory] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -299,13 +302,15 @@ export default function Timeline() {
               <span className="font-mono text-xs text-text-dim">
                 Defense Block Rate: <strong className="text-safe">{defenseRate}%</strong>
               </span>
-              <button
-                onClick={() => { setShowAddModal(true); setAddError(''); }}
-                className="flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 font-sans text-xs font-semibold text-accent hover:bg-accent/20 transition-all"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Parameter
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { setShowAddModal(true); setAddError(''); }}
+                  className="flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 font-sans text-xs font-semibold text-accent hover:bg-accent/20 transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Parameter
+                </button>
+              )}
             </div>
           </div>
 
@@ -342,7 +347,7 @@ export default function Timeline() {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {param.isCustom && (
+                      {param.isCustom && isAdmin && (
                         <button
                           onClick={() => handleDeleteParameter(param.key)}
                           title="Delete Parameter"
@@ -386,13 +391,13 @@ export default function Timeline() {
                         <div className="flex items-center gap-1">
                           <span
                             onClick={() => {
-                              if (param.isCustom) {
+                              if (param.isCustom && isAdmin) {
                                 setEditingParam(param.key)
                                 setEditWeightVal(param.weight)
                               }
                             }}
-                            className={`font-bold ${param.isCustom ? 'cursor-pointer hover:underline text-accent' : 'text-accent'}`}
-                            title={param.isCustom ? "Click to edit weight" : "System learned weight"}
+                            className={`font-bold ${param.isCustom && isAdmin ? 'cursor-pointer hover:underline text-accent' : 'text-accent'}`}
+                            title={param.isCustom && isAdmin ? "Click to edit weight" : "System learned weight"}
                           >
                             w={weightVal}
                           </span>

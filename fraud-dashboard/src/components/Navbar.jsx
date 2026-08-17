@@ -7,16 +7,14 @@ export default function Navbar() {
   const { connectionStatus } = useLiveFeed()
   const { user, isAdmin, logout } = useAuth()
 
-  // Users see their dashboard; admins also see ops pages + admin link
   const NAV_ITEMS = [
-    { to: '/', label: 'My Data', icon: Database, end: true },
+    { to: '/ops/overview',  label: 'Live Overview',         icon: LayoutDashboard },
+    { to: '/ops/timeline',  label: 'Attack Simulator',      icon: Clock },
+    { to: '/ops/monitoring',label: 'Engine Logs',           icon: Activity },
+    { to: '/ops/real-data', label: 'Real & Simulated Data', icon: Database },
+    { to: '/ops/reports',   label: 'Reports',               icon: FileBarChart },
     ...(isAdmin ? [
-      { to: '/admin', label: 'Admin', icon: Settings },
-      { to: '/ops/overview', label: 'Overview', icon: LayoutDashboard },
-      { to: '/ops/timeline', label: 'Timeline', icon: Clock },
-      { to: '/ops/monitoring', label: 'Engine Logs', icon: Activity },
-      { to: '/ops/real-data', label: 'Real Data', icon: Database },
-      { to: '/ops/reports', label: 'Reports', icon: FileBarChart },
+      { to: '/admin', label: 'Admin Portal', icon: Settings },
     ] : []),
   ]
 

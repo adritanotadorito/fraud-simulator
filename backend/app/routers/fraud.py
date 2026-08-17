@@ -92,6 +92,12 @@ async def simulate_round(persona: Optional[str] = None):
     decisions = []
     blocked = flagged = allowed = 0
 
+    import uuid
+    from datetime import datetime, timezone
+    from app.ws.manager import get_manager
+
+    manager = get_manager()
+
     for txn_id in attack.transactions_generated:
         try:
             decision = await shield_gpt.analyze_transaction(
@@ -104,6 +110,30 @@ async def simulate_round(persona: Optional[str] = None):
                 flagged += 1
             else:
                 allowed += 1
+
+            # Fetch transaction details for live feed
+            txn_doc = await find_one("transactions", {"txn_id": txn_id})
+            merchant_name = txn_doc.get("merchant_name", "Online Store") if txn_doc else "Online Store"
+            amount = txn_doc.get("amount", 100.0) if txn_doc else 100.0
+
+            event_payload = {
+                "event_id": f"evt_{uuid.uuid4().hex[:8]}",
+                "transaction": {
+                    "transaction_id": txn_id,
+                    "merchant": merchant_name,
+                    "amount": amount,
+                    "user_id": txn_doc.get("user_id", "usr_sim") if txn_doc else "usr_sim",
+                    "account_id": txn_doc.get("account_id", "acc_sim") if txn_doc else "acc_sim",
+                    "timestamp": txn_doc.get("timestamp", datetime.now(timezone.utc).isoformat()) if txn_doc else datetime.now(timezone.utc).isoformat()
+                },
+                "shieldgpt": decision.model_dump(),
+                "fraudgpt": {
+                    "persona": attack.persona
+                }
+            }
+
+            await manager.broadcast(event_payload)
+
         except Exception as e:
             logger.error(f"Analysis error for {txn_id}: {e}")
 

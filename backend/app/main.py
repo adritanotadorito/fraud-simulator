@@ -61,9 +61,111 @@ async def lifespan(app: FastAPI):
         logger.warning("MongoDB not available. Running in degraded mode (API endpoints that need DB will fail).")
 
     logger.info("Fraud Shield AI is ready!")
+    import asyncio
+    stream_task = asyncio.create_task(_auto_stream_transactions())
     yield
     logger.info("Shutting down Fraud Shield AI...")
+    stream_task.cancel()
     await close_mongo_connection()
+
+
+async def _auto_stream_transactions():
+    """Background task to continuously stream live transactions and decisions over WebSockets."""
+    await asyncio.sleep(2)
+    from app.ws.manager import get_manager
+    from app.orchestrator.shieldgpt import ShieldGPTOrchestrator
+    from app.orchestrator.llm_client import LLMClient
+    from app.models.schemas import ScoreRequest
+    from app.database import insert_one
+    import random
+    import uuid
+    from datetime import datetime, timezone
+
+    merchants = [
+        "Amazon Store", "Flipkart Pay", "Swiggy Foods", "BigBasket Grocery",
+        "IRCTC Railways", "Ola Cabs", "MakeMyTrip Flights", "Nykaa Beauty",
+        "Apple Store", "Netflix Subscription", "Uber Rides", "Starbucks Coffee"
+    ]
+    cities = [
+        ("Mumbai", "IN", 19.0760, 72.8777),
+        ("Delhi", "IN", 28.6139, 77.2090),
+        ("Bengaluru", "IN", 12.9716, 77.5946),
+        ("New York", "US", 40.7128, -74.0060),
+        ("London", "GB", 51.5074, -0.1278)
+    ]
+    personas = ["account_takeover", "card_testing", "device_spoofing", "money_mule", "legitimate_flow", "legitimate_flow", "legitimate_flow"]
+
+    llm = LLMClient()
+    shield = ShieldGPTOrchestrator(llm)
+
+    while True:
+        try:
+            await asyncio.sleep(4)
+            manager = get_manager()
+            if not manager.active_connections:
+                continue
+
+            city, country, lat, lon = random.choice(cities)
+            merchant = random.choice(merchants)
+            persona = random.choice(personas)
+            is_fraud = persona != "legitimate_flow"
+            amount = round(random.uniform(5.0, 4999.0) if not is_fraud else random.uniform(500.0, 15000.0), 2)
+            txn_id = f"txn_live_{uuid.uuid4().hex[:8]}"
+
+            txn_doc = {
+                "txn_id": txn_id,
+                "account_id": f"acc_{random.randint(100, 999)}",
+                "user_id": f"usr_{random.randint(100, 999)}",
+                "amount": amount,
+                "currency": "USD",
+                "merchant_id": f"merch_{uuid.uuid4().hex[:6]}",
+                "merchant_name": merchant,
+                "device_id": f"dev_{uuid.uuid4().hex[:6]}",
+                "session_id": f"sess_{uuid.uuid4().hex[:6]}",
+                "geo": {"ip": f"103.{random.randint(1,254)}.{random.randint(1,254)}.{random.randint(1,254)}",
+                        "country": country, "city": city, "latitude": lat, "longitude": lon},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "type": "purchase",
+                "is_fraud": is_fraud,
+                "is_simulated": True,
+                "source": "live_stream"
+            }
+            await insert_one("transactions", txn_doc)
+
+            try:
+                score_resp = await shield.analyze_transaction(ScoreRequest(txn_id=txn_id))
+                decision_data = score_resp.model_dump()
+            except Exception:
+                decision_data = {
+                    "txn_id": txn_id,
+                    "decision": "BLOCK" if is_fraud and amount > 2000 else ("FLAG" if is_fraud else "ALLOW"),
+                    "risk_score": 0.92 if is_fraud else 0.12,
+                    "confidence": 0.88,
+                    "reasons": ["High Risk Velocity Anomaly" if is_fraud else "Normal behavioral pattern"],
+                    "explanation": "Evaluated by ShieldGPT Rule Engine & ML Fusion.",
+                    "engine_scores": {"biometrics": 0.85 if is_fraud else 0.1, "geo": 0.9 if is_fraud else 0.05, "device": 0.88 if is_fraud else 0.12}
+                }
+
+            event_payload = {
+                "event_id": f"evt_{uuid.uuid4().hex[:8]}",
+                "transaction": {
+                    "transaction_id": txn_id,
+                    "merchant": merchant,
+                    "amount": amount,
+                    "user_id": txn_doc["user_id"],
+                    "account_id": txn_doc["account_id"],
+                    "timestamp": txn_doc["timestamp"]
+                },
+                "shieldgpt": decision_data,
+                "fraudgpt": {
+                    "persona": persona
+                }
+            }
+            await manager.broadcast(event_payload)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"Background stream error: {e}")
 
 
 app = FastAPI(

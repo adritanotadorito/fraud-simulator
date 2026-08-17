@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:7
@@ -13,6 +11,9 @@ services:
     build: 
       context: ./backend
       dockerfile: Dockerfile
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "8000:8000"
     environment:
@@ -25,7 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend:/app
-      - ./ml/models:/app/../ml/models:ro
+      - ./ml/models:/ml/models:ro
 
   frontend:
     build:
@@ -34,6 +35,9 @@ services:
       args:
         VITE_API_URL: http://localhost:8000
         VITE_WS_URL: ws://localhost:8000/api/transactions/stream
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "5173:80"
     depends_on:
