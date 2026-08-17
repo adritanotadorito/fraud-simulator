@@ -4,6 +4,7 @@
   "private": true,
   "description": "Fraud Shield AI — FraudGPT vs ShieldGPT adversarial fraud detection platform",
   "scripts": {
+    "dev": "npm --prefix fraud-dashboard run dev",
     "dev:frontend": "npm --prefix fraud-dashboard run dev",
     "dev:backend": "cd backend && uvicorn app.main:app --reload --port 8000",
     "build": "npm --prefix fraud-dashboard run build",
@@ -11,3 +12,4 @@
     "retrain": "cd ml && python retrain_models.py"
   }
 }
+

@@ -15,6 +15,7 @@ export default function Navbar() {
       { to: '/ops/overview', label: 'Overview', icon: LayoutDashboard },
       { to: '/ops/timeline', label: 'Timeline', icon: Clock },
       { to: '/ops/monitoring', label: 'Engine Logs', icon: Activity },
+      { to: '/ops/real-data', label: 'Real Data', icon: Database },
       { to: '/ops/reports', label: 'Reports', icon: FileBarChart },
     ] : []),
   ]

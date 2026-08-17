@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard'
 import Timeline from './pages/Timeline'
 import Monitoring from './pages/Monitoring'
 import Reports from './pages/Reports'
+import RealData from './pages/RealData'
 
 export default function App() {
   return (
@@ -42,6 +43,9 @@ export default function App() {
                       } />
                       <Route path="/ops/monitoring" element={
                         <ProtectedRoute adminOnly><Monitoring /></ProtectedRoute>
+                      } />
+                      <Route path="/ops/real-data" element={
+                        <ProtectedRoute adminOnly><RealData /></ProtectedRoute>
                       } />
                       <Route path="/ops/reports" element={
                         <ProtectedRoute adminOnly><Reports /></ProtectedRoute>
