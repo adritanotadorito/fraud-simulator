@@ -16,10 +16,12 @@ ENV/
 .env
 .env.local
 
-# Models
+# Models (blanket ignore, then whitelist our trained models)
 *.pkl
 *.joblib
 *.h5
+!ml/models/*.pkl
+!ml/models/*.joblib
 
 # Data
 ml/data/creditcard.csv
@@ -42,11 +44,10 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# Node
+node_modules/
+
 # Distribution
 dist/
 build/
 *.egg-info/
-
-# Node
-node_modules/
-**/node_modules/

@@ -6,14 +6,27 @@ from app.models.schemas import EngineScoreResponse
 
 logger = logging.getLogger(__name__)
 
-# Path to Adrita's trained model
+# Path to trained model (9-feature version — see ml/retrain_models.py)
 MODEL_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "ml", "models", "fraud_model.pkl"
 )
 
+# The 9 features the retrained model expects — must match retrain_models.py::FEATURES
+MODEL_FEATURES = [
+    "amount",
+    "amount_zscore",
+    "transaction_velocity",
+    "time_diff",
+    "device_change_flag",
+    "geo_velocity",
+    "biometric_deviation",
+    "hour_of_day",
+    "is_new_merchant",
+]
+
 
 class XGBoostScorer:
-    """XGBoost Model Scorer — uses Adrita's trained model when available, falls back to heuristic."""
+    """XGBoost Model Scorer — uses the 9-feature retrained model when available, falls back to heuristic."""
 
     def __init__(self):
         self.model = None
@@ -21,7 +34,7 @@ class XGBoostScorer:
         self._load_model()
 
     def _load_model(self):
-        """Attempt to load Adrita's trained XGBoost model."""
+        """Attempt to load the retrained XGBoost model."""
         try:
             import joblib
             resolved = os.path.abspath(MODEL_PATH)
@@ -38,7 +51,10 @@ class XGBoostScorer:
     def extract_features(
         self, transaction, session=None, device=None, user_history=None
     ) -> Dict[str, float]:
-        """Extract features compatible with both real model and heuristic."""
+        """Extract the 9 features the retrained model expects.
+
+        All of these are derivable at inference time from real/uploaded data.
+        """
         def g(obj, key, default=0.0):
             if obj is None:
                 return default
@@ -48,6 +64,7 @@ class XGBoostScorer:
 
         amount = float(g(transaction, "amount", 0))
 
+        # Biometrics
         bio = {}
         if session:
             bio = g(session, "biometrics", {})
@@ -56,43 +73,82 @@ class XGBoostScorer:
             elif not isinstance(bio, dict):
                 bio = {}
 
+        # Device flags
+        vpn = g(device, "vpn_flag", False)
+        emulator = g(device, "emulator_flag", False)
+        tor = g(device, "tor_flag", False)
+        device_change = 1.0 if (vpn or emulator or tor) else 0.0
+
+        # Geo velocity — from transaction extra data or default
+        geo_velocity = float(g(transaction, "geo_velocity", 0.0))
+        if geo_velocity == 0.0:
+            # Check extras dict if present (uploaded CSVs may store it there)
+            extras = g(transaction, "extra", {})
+            if isinstance(extras, dict):
+                geo_velocity = float(extras.get("geo_velocity", 0.0))
+
+        # Biometric deviation
+        biometric_deviation = float(
+            bio.get("mouse_pattern_deviation", 0.1) if isinstance(bio, dict) else 0.1
+        )
+
+        # Hour of day
+        hour = 12.0
+        timestamp = g(transaction, "timestamp", None)
+        if timestamp:
+            try:
+                if hasattr(timestamp, "hour"):
+                    hour = float(timestamp.hour)
+                else:
+                    from datetime import datetime
+                    ts = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+                    hour = float(ts.hour)
+            except Exception:
+                pass
+
+        # Transaction velocity / time_diff
+        velocity = float(g(transaction, "transaction_velocity", 0.0))
+        time_diff = float(g(transaction, "time_diff", 600.0))
+
+        # Check extras for these fields too (uploaded CSVs)
+        extras = g(transaction, "extra", {})
+        if isinstance(extras, dict):
+            if velocity == 0.0:
+                velocity = float(extras.get("transaction_velocity", 0.0))
+            if time_diff == 600.0:
+                time_diff = float(extras.get("time_diff", 600.0))
+
         return {
             "amount": amount,
-            "velocity": 1.0,
             "amount_zscore": min(amount / 1000.0, 5.0),
-            "device_change": 1.0 if g(device, "vpn_flag", False) or g(device, "emulator_flag", False) else 0.0,
-            "geo_velocity": 0.0,
-            "biometric_deviation": float(bio.get("mouse_pattern_deviation", 0.1) if isinstance(bio, dict) else 0.1),
-            "hour_of_day": 12.0,
-            "is_new_merchant": 0.0,
+            "transaction_velocity": velocity,
+            "time_diff": time_diff,
+            "device_change_flag": device_change,
+            "geo_velocity": geo_velocity,
+            "biometric_deviation": biometric_deviation,
+            "hour_of_day": hour,
+            "is_new_merchant": float(g(transaction, "is_new_merchant", 0.0)),
         }
 
     def _predict_with_model(self, features: Dict[str, float]) -> float:
-        """Run prediction through Adrita's real XGBoost model."""
+        """Run prediction through the retrained XGBoost model (9 features)."""
         try:
             import pandas as pd
-            import numpy as np
 
-            # Map our feature names to Adrita's training feature names
-            # Her model was trained on creditcard.csv with engineered features
-            # We build a compatible feature vector
             feature_df = pd.DataFrame([{
-                "Amount": features.get("amount", 0),
+                "amount": features.get("amount", 0),
                 "amount_zscore": features.get("amount_zscore", 0),
-                "transaction_velocity": features.get("velocity", 0),
-                "device_change_flag": int(features.get("device_change", 0)),
+                "transaction_velocity": features.get("transaction_velocity", 0),
+                "time_diff": features.get("time_diff", 0),
+                "device_change_flag": features.get("device_change_flag", 0),
                 "geo_velocity": features.get("geo_velocity", 0),
                 "biometric_deviation": features.get("biometric_deviation", 0),
-                "time_diff": 0,
+                "hour_of_day": features.get("hour_of_day", 12),
+                "is_new_merchant": features.get("is_new_merchant", 0),
             }])
 
-            # Pad remaining columns the model expects with zeros (V1-V28, Time, etc.)
-            model_features = self.model.get_booster().feature_names
-            if model_features:
-                for col in model_features:
-                    if col not in feature_df.columns:
-                        feature_df[col] = 0.0
-                feature_df = feature_df[model_features]
+            # Ensure column order matches training
+            feature_df = feature_df[MODEL_FEATURES]
 
             proba = self.model.predict_proba(feature_df)[0][1]
             return float(proba)
@@ -103,8 +159,8 @@ class XGBoostScorer:
     def _heuristic_score(self, features: Dict[str, float]) -> float:
         """Heuristic fallback scoring."""
         amount_risk = min(features.get("amount", 0) / 10000.0, 1.0)
-        velocity_risk = min(features.get("velocity", 0) / 5.0, 1.0)
-        device_risk = features.get("device_change", 0.0)
+        velocity_risk = min(features.get("transaction_velocity", 0) / 0.5, 1.0)
+        device_risk = features.get("device_change_flag", 0.0)
         geo_risk = min(features.get("geo_velocity", 0) / 1000.0, 1.0)
         biometric_risk = min(features.get("biometric_deviation", 0), 1.0)
 
@@ -135,7 +191,7 @@ class XGBoostScorer:
         amount_risk = min(features.get("amount", 0) / 10000.0, 1.0)
         if amount_risk > 0.6:
             signals.append("High amount risk (XGB)")
-        if features.get("device_change", 0) > 0.5:
+        if features.get("device_change_flag", 0) > 0.5:
             signals.append("Device change risk (XGB)")
 
         return EngineScoreResponse(

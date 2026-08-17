@@ -75,9 +75,6 @@ class Transaction(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     type: str = Field(default="purchase", pattern="^(purchase|transfer|withdrawal)$")
     is_fraud: Optional[bool] = None  # ground truth label if available
-    is_real: bool = True
-    source: str = "real_api"
-
 
 class FraudEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid4()))

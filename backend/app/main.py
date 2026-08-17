@@ -24,6 +24,8 @@ from app.routers.graph import router as graph_router
 from app.routers.threat_intel import router as threat_intel_router
 from app.routers.metrics import router as metrics_router
 from app.routers.reports import router as reports_router
+from app.routers.auth import router as auth_router
+from app.routers.admin import router as admin_router
 
 
 @asynccontextmanager
@@ -116,6 +118,8 @@ app.include_router(graph_router)
 app.include_router(threat_intel_router)
 app.include_router(metrics_router)
 app.include_router(reports_router)
+app.include_router(auth_router)
+app.include_router(admin_router)
 
 
 # ---- Health Endpoints ----

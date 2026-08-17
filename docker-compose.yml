@@ -17,19 +17,28 @@ services:
       - "8000:8000"
     environment:
       - FRAUD_SHIELD_MONGO_URI=mongodb://mongodb:27017
+      - FRAUD_SHIELD_MONGO_DB_NAME=fraud_shield_ai
+      - FRAUD_SHIELD_JWT_SECRET=change-me-in-production-use-openssl-rand-hex-32
+      - FRAUD_SHIELD_JWT_EXPIRE_MINUTES=480
     depends_on:
       - mongodb
     restart: unless-stopped
     volumes:
       - ./backend:/app
+      - ./ml/models:/app/../ml/models:ro
 
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: ./fraud-dashboard
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_WS_URL: ws://localhost:8000/api/transactions/stream
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   mongodb_data:
