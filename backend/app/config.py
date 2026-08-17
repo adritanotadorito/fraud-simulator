@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     WS_BROADCAST_INTERVAL: float = 1.0
     CORS_ORIGINS: List[str] = ["*"]
     LOG_LEVEL: str = "INFO"
+
+    # JWT Auth
+    JWT_SECRET: str = "change-me-in-production-use-openssl-rand-hex-32"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 480  # 8 hours
     
     FUSION_WEIGHTS: Dict[str, float] = {
         "xgboost": 0.55,

@@ -1,0 +1,13 @@
+{
+  "name": "fraud-shield-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fraud Shield AI — FraudGPT vs ShieldGPT adversarial fraud detection platform",
+  "scripts": {
+    "dev:frontend": "npm --prefix fraud-dashboard run dev",
+    "dev:backend": "cd backend && uvicorn app.main:app --reload --port 8000",
+    "build": "npm --prefix fraud-dashboard run build",
+    "preview": "npm --prefix fraud-dashboard run preview",
+    "retrain": "cd ml && python retrain_models.py"
+  }
+}

@@ -111,6 +111,9 @@ async def create_indexes() -> None:
         await db["sessions"].create_index([("session_id", 1)], unique=True)
         await db["users"].create_index([("user_id", 1)], unique=True)
         await db["devices"].create_index([("device_id", 1)], unique=True)
+        # Auth indexes
+        await db["app_users"].create_index([("email", 1)], unique=True)
+        await db["app_users"].create_index([("id", 1)], unique=True)
         logger.info("Database indexes created successfully.")
     except Exception as e:
         logger.warning(f"Index creation failed: {e}")

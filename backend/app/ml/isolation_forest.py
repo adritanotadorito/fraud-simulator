@@ -9,12 +9,25 @@ MODEL_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "ml", "models", "isolation_forest.pkl"
 )
 
-# Typical value ranges for anomaly detection
+# Same 9-feature list as XGBoost — must match retrain_models.py::FEATURES
+MODEL_FEATURES = [
+    "amount",
+    "amount_zscore",
+    "transaction_velocity",
+    "time_diff",
+    "device_change_flag",
+    "geo_velocity",
+    "biometric_deviation",
+    "hour_of_day",
+    "is_new_merchant",
+]
+
+# Typical value ranges for heuristic anomaly detection
 TYPICAL_RANGES = {
     "amount": (5.0, 500.0),
-    "velocity": (0.0, 3.0),
-    "amount_zscore": (0.0, 2.0),
-    "device_change": (0.0, 0.0),
+    "transaction_velocity": (0.0, 0.3),
+    "amount_zscore": (-1.0, 2.0),
+    "device_change_flag": (0.0, 0.0),
     "geo_velocity": (0.0, 200.0),
     "biometric_deviation": (0.0, 0.3),
     "hour_of_day": (6.0, 22.0),
@@ -23,7 +36,7 @@ TYPICAL_RANGES = {
 
 
 class IsolationForestScorer:
-    """Isolation Forest Scorer — uses Adrita's trained model when available."""
+    """Isolation Forest Scorer — uses the 9-feature retrained model when available."""
 
     def __init__(self):
         self.model = None
@@ -31,7 +44,7 @@ class IsolationForestScorer:
         self._load_model()
 
     def _load_model(self):
-        """Attempt to load Adrita's trained Isolation Forest model."""
+        """Attempt to load the retrained Isolation Forest model."""
         try:
             import joblib
             resolved = os.path.abspath(MODEL_PATH)
@@ -45,30 +58,34 @@ class IsolationForestScorer:
             logger.warning(f"Failed to load Isolation Forest model: {e}, using heuristic")
 
     def _predict_with_model(self, features: Dict[str, float]) -> float:
-        """Run through Adrita's real Isolation Forest."""
+        """Run through the retrained Isolation Forest — returns a continuous anomaly score [0, 1]."""
         try:
             import pandas as pd
+            import numpy as np
 
             feature_df = pd.DataFrame([{
-                "Amount": features.get("amount", 0),
+                "amount": features.get("amount", 0),
                 "amount_zscore": features.get("amount_zscore", 0),
-                "transaction_velocity": features.get("velocity", 0),
-                "device_change_flag": int(features.get("device_change", 0)),
+                "transaction_velocity": features.get("transaction_velocity", 0),
+                "time_diff": features.get("time_diff", 0),
+                "device_change_flag": features.get("device_change_flag", 0),
                 "geo_velocity": features.get("geo_velocity", 0),
                 "biometric_deviation": features.get("biometric_deviation", 0),
-                "time_diff": 0,
+                "hour_of_day": features.get("hour_of_day", 12),
+                "is_new_merchant": features.get("is_new_merchant", 0),
             }])
 
-            # Pad missing columns
-            if hasattr(self.model, "feature_names_in_"):
-                for col in self.model.feature_names_in_:
-                    if col not in feature_df.columns:
-                        feature_df[col] = 0.0
-                feature_df = feature_df[self.model.feature_names_in_]
+            # Ensure column order matches training
+            feature_df = feature_df[MODEL_FEATURES]
 
-            prediction = self.model.predict(feature_df)[0]
-            # Isolation Forest returns -1 for anomaly, 1 for normal
-            return 1.0 if prediction == -1 else 0.0
+            # decision_function returns negative for anomalies, positive for inliers.
+            # Convert to a 0-1 anomaly score: more negative → higher anomaly score.
+            raw_score = self.model.decision_function(feature_df)[0]
+
+            # Typical range is roughly [-0.5, 0.5]. Map to [0, 1] anomaly score.
+            # Clamp and invert: lower raw_score → higher anomaly.
+            anomaly_score = float(np.clip(-raw_score * 2.0 + 0.5, 0.0, 1.0))
+            return anomaly_score
         except Exception as e:
             logger.warning(f"Isolation Forest prediction failed: {e}, using heuristic")
             return self._heuristic_score(features)
