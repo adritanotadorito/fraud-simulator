@@ -23,12 +23,18 @@ class LLMClient:
         self.client = None
         if self.api_key:
             if self.provider == 'gemini':
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self.client = genai.GenerativeModel('gemini-pro')
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=self.api_key)
+                    self.client = genai.GenerativeModel('gemini-pro')
+                except ImportError:
+                    logger.warning("google-generativeai package not installed. Falling back to heuristic/rule response.")
             elif self.provider == 'openai':
-                from openai import AsyncOpenAI
-                self.client = AsyncOpenAI(api_key=self.api_key)
+                try:
+                    from openai import AsyncOpenAI
+                    self.client = AsyncOpenAI(api_key=self.api_key)
+                except ImportError:
+                    logger.warning("openai package not installed. Falling back to heuristic/rule response.")
 
     async def generate(self, system_prompt: str, user_prompt: str, response_format: str = 'json') -> dict:
         if not self.api_key or not self.client:

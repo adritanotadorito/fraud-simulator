@@ -19,6 +19,7 @@ services:
     environment:
       - FRAUD_SHIELD_MONGO_URI=mongodb://mongodb:27017
       - FRAUD_SHIELD_MONGO_DB_NAME=fraud_shield_ai
+      # SECURITY NOTE: Override FRAUD_SHIELD_JWT_SECRET in production via environment or .env file (e.g. export FRAUD_SHIELD_JWT_SECRET=$(openssl rand -hex 32))
       - FRAUD_SHIELD_JWT_SECRET=change-me-in-production-use-openssl-rand-hex-32
       - FRAUD_SHIELD_JWT_EXPIRE_MINUTES=480
     depends_on:

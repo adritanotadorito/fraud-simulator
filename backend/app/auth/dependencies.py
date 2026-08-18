@@ -1,23 +1,38 @@
 """
 dependencies.py — FastAPI dependencies for auth: get_current_user, require_admin.
+Includes HTTPBearer security scheme to enable OpenAPI / Swagger UI padlock and Authorize modal.
 """
 
 import logging
+from typing import Optional
 from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.auth.security import decode_access_token
 from app.database import find_one
 
 logger = logging.getLogger(__name__)
 
+# Register HTTPBearer security scheme in OpenAPI specs
+security = HTTPBearer(auto_error=False)
 
-async def get_current_user(request: Request) -> dict:
+
+async def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> dict:
     """Extract + validate the Bearer token, return the app_users document."""
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    token = None
+    if credentials:
+        token = credentials.credentials
+    else:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+
+    if not token:
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
-    token = auth_header.split(" ", 1)[1]
     try:
         payload = decode_access_token(token)
     except Exception:
