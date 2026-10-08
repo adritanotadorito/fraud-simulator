@@ -1,6 +1,6 @@
 # Fraud Shield AI
 
-**FraudGPT vs ShieldGPT** — An adversarial fraud detection platform with real ML scoring, JWT auth, per-user data isolation, and an admin dashboard.
+**FraudGPT vs ShieldGPT** — An adversarial fraud detection platform with real ML scoring, JWT auth, per-user data isolation, and an admin dashboard. This was our submission for the CXO Cywayz CXO-INNOFEST (CIF) Hackathon 2026.
 
 ---
 
